@@ -65,14 +65,25 @@ def find_image_on_screen(image_path):
 def find_text_on_screen(search_string, image):
     try:
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
         _, processed_image = cv2.threshold(gray_image, 125, 255, cv2.THRESH_BINARY_INV)
+
+        kernel = np.ones((3, 2), np.uint8)
+        processed_image = cv2.dilate(processed_image, kernel, iterations=1)
+        kernel = np.ones((1, 2), np.uint8)
+        processed_image = cv2.erode(processed_image, kernel, iterations=1)
+
+        cv2.imwrite("./logs/processed_image.png", processed_image)
+
         custom_config = r"--oem 3 --psm 6"
         extracted_text = pytesseract.image_to_string(
             processed_image, config=custom_config
         )
+
         with open("./logs/extracted_text.txt", "w", encoding="utf-8") as file:
             file.write(extracted_text.lower())
             file.flush()
+
         return search_string.lower() in extracted_text.lower()
     except Exception as e:
         print(f"Erro ao encontrar texto na tela: {e}")
