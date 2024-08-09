@@ -83,7 +83,7 @@ def find_text_on_screen(search_string, image):
     extracted_text = pytesseract.image_to_string(processed_image, config=custom_config)
 
     # Salvar log
-    with open("./logs/text.txt", "w") as file:
+    with open("extracted_text.txt", "w", encoding="utf-8") as file:
         file.write(extracted_text.lower())
 
     # Verifica se a string fornecida está presente no texto extraído
