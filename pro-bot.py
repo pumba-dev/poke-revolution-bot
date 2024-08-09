@@ -8,10 +8,10 @@ import sys
 
 # Def catch list of pokemons
 BATTLE_COUNT = 0
-POKE_CATCH_COUNT = 0
 RARE_CATCH_COUNT = 0
-POKEBALL_LIST = ["ultraball"]
-CATCH_POKE_LIST = ["Froakie", "Summer", "Shiny", "Alolan"]
+POKE_CATCH_COUNT = []
+POKEBALL_LIST = ["pokeball", "ultraball"]
+CATCH_POKE_LIST = ["Froakie", "Summer", "Shiny", "Alolan", "Snivy", "Pikachu"]
 
 
 def click_at_position(x, y):
@@ -72,24 +72,28 @@ def find_image_on_screen(image_path):
 
 
 def find_text_on_screen(search_string, image):
-    # Converte a imagem para escala de cinza
-    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    try:
+        # Converte a imagem para escala de cinza
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Aplica um limiar (threshold) para binarizar a imagem
-    _, processed_image = cv2.threshold(gray_image, 125, 255, cv2.THRESH_BINARY_INV)
+        # Aplica um limiar (threshold) para binarizar a imagem
+        _, processed_image = cv2.threshold(gray_image, 125, 255, cv2.THRESH_BINARY_INV)
 
-    # Realiza OCR na imagem processada
-    custom_config = r"--oem 3 --psm 6"
-    extracted_text = pytesseract.image_to_string(processed_image, config=custom_config)
+        # Realiza OCR na imagem processada
+        custom_config = r"--oem 3 --psm 6"
+        extracted_text = pytesseract.image_to_string(
+            processed_image, config=custom_config
+        )
 
-    # Salvar log
-    with open("extracted_text.txt", "w", encoding="utf-8") as file:
-        file.write(extracted_text.lower())
+        # Salvar log
+        with open("./logs/extracted_text.txt", "w", encoding="utf-8") as file:
+            file.write(extracted_text.lower())
+            file.flush()
 
-    # Verifica se a string fornecida está presente no texto extraído
-    if search_string.lower() in extracted_text.lower():
-        return True
-    else:
+        # Verifica se a string fornecida está presente no texto extraído
+        return search_string.lower() in extracted_text.lower()
+    except Exception as e:
+        print(f"Erro ao encontrar texto na tela: {e}")
         return False
 
 
@@ -97,6 +101,18 @@ def game_in_battle_mode():
     fightBtnPos = find_image_on_screen("./assets/icons/battle_icon.png")
     if fightBtnPos is not None:
         return True
+
+
+def add_new_catched_poke(newPoke):
+    global POKE_CATCH_COUNT
+
+    for poke in POKE_CATCH_COUNT:
+        if poke[0] == newPoke:
+            poke[1] += 1
+            return
+
+    POKE_CATCH_COUNT.append((newPoke, 1))
+    return
 
 
 def enemy_pokemon_is_catchable():
@@ -111,7 +127,9 @@ def enemy_pokemon_is_catchable():
         if find_text_on_screen(poke, screen):
             sys.stdout.flush()
             sys.stdout.write(f"\rEncontrado {poke} para capturar ✅\n")
-            POKE_CATCH_COUNT += 1
+
+            add_new_catched_poke(poke)
+
             return poke
 
     sys.stdout.flush()
@@ -184,7 +202,7 @@ def run_away_wild_battle():
         sys.stdout.write("Tentando fugir da batalha 🚪\n")
         sys.stdout.flush()
         pyautogui.press("4")
-        time.sleep(1)
+        time.sleep(0.5)
         in_battle = game_in_battle_mode()
 
 
@@ -192,8 +210,10 @@ if __name__ == "__main__":
     while True:
         sys.stdout.write("\n\n📍 INICIANDO NOVO CICLO 📍\n")
         sys.stdout.write("Batalhas iniciadas: " + str(BATTLE_COUNT) + "\n")
-        sys.stdout.write("Pokemons capturados: " + str(POKE_CATCH_COUNT) + "\n")
         sys.stdout.write("Pokemons raros capturados: " + str(RARE_CATCH_COUNT) + "\n")
+        sys.stdout.write("Pokemons capturados: \n")
+        for poke in POKE_CATCH_COUNT:
+            sys.stdout.write(f"{poke[0]}: {poke[1]}\n")
 
         in_battle = game_in_battle_mode()
 
