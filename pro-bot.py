@@ -65,13 +65,16 @@ def find_image_on_screen(image_path):
 def find_text_on_screen(search_string, image):
     try:
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        cv2.imwrite("./logs/gray_image.png", gray_image)
 
-        _, processed_image = cv2.threshold(gray_image, 125, 255, cv2.THRESH_BINARY_INV)
+        _, processed_image = cv2.threshold(gray_image, 110, 255, cv2.THRESH_BINARY_INV)
 
-        kernel = np.ones((3, 2), np.uint8)
-        processed_image = cv2.dilate(processed_image, kernel, iterations=1)
-        kernel = np.ones((1, 2), np.uint8)
-        processed_image = cv2.erode(processed_image, kernel, iterations=1)
+        # Definir o kernel para a operação de dilatação
+        kernel = np.ones((1, 1), np.uint8)
+        processed_image = cv2.dilate(processed_image, kernel, iterations=10)
+
+        kernel = np.ones((1, 1), np.uint8)
+        processed_image = cv2.erode(processed_image, kernel, iterations=10)
 
         cv2.imwrite("./logs/processed_image.png", processed_image)
 
@@ -196,6 +199,11 @@ def printCatchLog():
 
 if __name__ == "__main__":
     while True:
+        while True:
+            screen = take_screenshot(size=(800, 500))
+            find_text_on_screen("nenhum", screen)
+            time.sleep(1)
+
         printCatchLog()
         in_battle = game_in_battle_mode()
         if not in_battle:
