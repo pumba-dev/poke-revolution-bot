@@ -108,7 +108,9 @@ def add_new_catched_poke(newPoke):
 
     for poke in POKE_CATCH_COUNT:
         if poke[0] == newPoke:
-            poke[1] += 1
+            poke_list = list(poke)
+            poke_list[1] += 1
+            poke = tuple(poke_list)
             return
 
     POKE_CATCH_COUNT.append((newPoke, 1))
@@ -127,9 +129,7 @@ def enemy_pokemon_is_catchable():
         if find_text_on_screen(poke, screen):
             sys.stdout.flush()
             sys.stdout.write(f"\rEncontrado {poke} para capturar ✅\n")
-
             add_new_catched_poke(poke)
-
             return poke
 
     sys.stdout.flush()
@@ -156,16 +156,14 @@ def enemy_pokemon_is_rare():
 
 def catch_wild_pokemon():
     sys.stdout.write("Capturando pokemon selvagem ⚪🔴\n")
-    # Check if the player has pokeballs
+
     for pokeball in POKEBALL_LIST:
         pokeballPos = find_image_on_screen(f"./assets/pokeballs/{pokeball}.png")
-        if pokeballPos is not None:
+        if pokeballPos:
             print("Item utilizado: " + pokeball)
             in_battle = True
             while in_battle:
-                # Click on the pokeball
                 click_at_position(*pokeballPos)
-
                 time.sleep(1)
                 in_battle = game_in_battle_mode()
             return True
@@ -206,17 +204,26 @@ def run_away_wild_battle():
         in_battle = game_in_battle_mode()
 
 
-if __name__ == "__main__":
-    while True:
-        sys.stdout.write("\n\n📍 INICIANDO NOVO CICLO 📍\n")
-        sys.stdout.write("Batalhas iniciadas: " + str(BATTLE_COUNT) + "\n")
-        sys.stdout.write("Pokemons raros capturados: " + str(RARE_CATCH_COUNT) + "\n")
-        sys.stdout.write("Pokemons capturados: \n")
+def printCatchLog():
+    global BATTLE_COUNT
+    global RARE_CATCH_COUNT
+
+    sys.stdout.write("\n\n📍 INICIANDO NOVO CICLO 📍\n")
+    sys.stdout.write("💥 Batalhas iniciadas: " + str(BATTLE_COUNT) + "\n")
+    sys.stdout.write("💎 Pokemons raros capturados: " + str(RARE_CATCH_COUNT) + "\n")
+    sys.stdout.write("🔴 Pokemons capturados ⚪️ \n")
+    if len(POKE_CATCH_COUNT) == 0:
+        sys.stdout.write("Nenhum 🅾️\n")
+    else:
         for poke in POKE_CATCH_COUNT:
             sys.stdout.write(f"{poke[0]}: {poke[1]}\n")
 
-        in_battle = game_in_battle_mode()
 
+if __name__ == "__main__":
+    while True:
+        printCatchLog()
+
+        in_battle = game_in_battle_mode()
         if not in_battle:
             walk_until_start_battle()
 
