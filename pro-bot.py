@@ -11,7 +11,15 @@ BATTLE_COUNT = 0
 RARE_CATCH_COUNT = 0
 POKE_CATCH_COUNT = []
 POKEBALL_LIST = ["pokeball", "ultraball"]
-CATCH_POKE_LIST = ["Froakie", "Summer", "Shiny", "Alolan", "Snivy", "Pikachu"]
+CATCH_POKE_LIST = [
+    "Summer",
+    "Shiny",
+    "Alolan",
+    "Froakie",
+    "Snivy",
+    "Tepig",
+    "Charmander",
+]
 
 
 class Pokemon:
@@ -20,7 +28,7 @@ class Pokemon:
         self.quantity = quantidade
 
     def __repr__(self):
-        return f"(nome={self.name}, qt={self.quantity})"
+        return f"{self.name}: {self.quantity}"
 
 
 def click_at_position(x, y):
@@ -67,7 +75,7 @@ def find_text_on_screen(search_string, image):
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         cv2.imwrite("./logs/gray_image.png", gray_image)
 
-        _, processed_image = cv2.threshold(gray_image, 100, 255, cv2.THRESH_BINARY_INV)
+        _, processed_image = cv2.threshold(gray_image, 125, 255, cv2.THRESH_BINARY_INV)
 
         # Definir o kernel para a operação de dilatação
         kernel = np.ones((1, 1), np.uint8)
@@ -174,9 +182,9 @@ def walk_until_start_battle():
 
 
 def run_away_wild_battle():
+    sys.stdout.write("\nTentando fugir da batalha 🚪\n")
     in_battle = game_in_battle_mode()
     while in_battle:
-        sys.stdout.write("Tentando fugir da batalha 🚪\n")
         sys.stdout.flush()
         pyautogui.press("4")
         time.sleep(0.5)
@@ -186,7 +194,7 @@ def run_away_wild_battle():
 def printCatchLog():
     global BATTLE_COUNT
     global RARE_CATCH_COUNT
-    sys.stdout.write("\n\n📍 INICIANDO NOVO CICLO 📍\n")
+    sys.stdout.write("\n\n\n📍 INICIANDO NOVO CICLO 📍\n\n")
     sys.stdout.write("💥 Batalhas iniciadas: " + str(BATTLE_COUNT) + "\n")
     sys.stdout.write("💎 Pokemons raros capturados: " + str(RARE_CATCH_COUNT) + "\n")
     sys.stdout.write("🔴 Pokemons capturados ⚪️ \n")
