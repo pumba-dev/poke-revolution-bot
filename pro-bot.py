@@ -5,8 +5,13 @@ import os
 import time
 import pytesseract
 import sys
+import pygetwindow as gw
+from pywinauto import Application
+import keyboard
+import pyperclip
 
 # Def catch list of pokemons
+GAME_WINDOW = "PROClient"
 BATTLE_COUNT = 0
 RARE_CATCH_COUNT = 0
 POKE_CATCH_COUNT = []
@@ -19,7 +24,11 @@ CATCH_POKE_LIST = [
     "Snivy",
     "Tepig",
     "Charmander",
+    "Growlithe",
 ]
+TRADE_MESSAGE = "SELL # [Poke94832752] 22/29 Timid Protean # [Poke94878838] 27/30 Jolly # [Poke94771887] 30/30 Timid Gluttony"
+
+stop_execution = False
 
 
 class Pokemon:
@@ -28,7 +37,43 @@ class Pokemon:
         self.quantity = quantidade
 
     def __repr__(self):
-        return f"{self.name}: {self.quantity}"
+        return f"{self.name}: [{self.quantity}]"
+
+
+def handle_close_app(e=None):
+    sys.stdout.write("\n\n🔴 Em instantes o bot será encerrado 🔴\n\n")
+    sys.stdout.flush()
+    global stop_execution
+    stop_execution = True
+    sys.exit(0)
+
+
+def send_keys_to_process(keys):
+    try:
+        # Conectar ao aplicativo pelo nome do processo
+        app = Application().connect(
+            title_re=GAME_WINDOW, backend="win32", visible_only=False
+        )
+
+        # Selecionar a janela principal do aplicativo
+        window = app.window(title_re=GAME_WINDOW)
+
+        # Enviar comandos do teclado diretamente para a janela
+        window.send_keystrokes(keys)
+
+    except Exception as e:
+        print(f"Erro ao enviar comandos para o processo: {e}")
+
+
+def open_game_window():
+    windows = gw.getWindowsWithTitle(GAME_WINDOW)
+
+    if not windows:
+        print(f"Janela do jogo não encontrada.")
+        return
+
+    window = windows[0]
+    window.activate()
 
 
 def click_at_position(x, y):
@@ -148,7 +193,7 @@ def enemy_pokemon_is_rare():
 
 
 def catch_wild_pokemon():
-    sys.stdout.write("Capturando pokemon selvagem ⚪🔴\n")
+    sys.stdout.write("\nCapturando pokemon selvagem ⚪🔴\n")
     for pokeball in POKEBALL_LIST:
         pokeballPos = find_image_on_screen(f"./assets/pokeballs/{pokeball}.png")
         if pokeballPos:
@@ -171,8 +216,8 @@ def walk_until_start_battle():
             break
         side1 = "a" if BATTLE_COUNT % 2 == 0 else "d"
         side2 = "d" if BATTLE_COUNT % 2 == 0 else "a"
-        time1 = 0.3 + (0.5 * np.random.random())
-        time2 = 0.3 + (0.5 * np.random.random())
+        time1 = 0.2 + (0.4 * np.random.random())
+        time2 = 0.2 + (0.4 * np.random.random())
         pyautogui.keyDown(side1)
         time.sleep(time1)
         pyautogui.keyUp(side1)
@@ -183,9 +228,11 @@ def walk_until_start_battle():
 
 def run_away_wild_battle():
     sys.stdout.write("\nTentando fugir da batalha 🚪\n")
+    sys.stdout.flush()
+
     in_battle = game_in_battle_mode()
+    open_game_window()
     while in_battle:
-        sys.stdout.flush()
         pyautogui.press("4")
         time.sleep(0.5)
         in_battle = game_in_battle_mode()
@@ -205,22 +252,53 @@ def printCatchLog():
             sys.stdout.write(f"{poke}\n")
 
 
+def sendTradeChatMessage():
+    sys.stdout.write("\n📋 Mandando mensagem no Trade 🤝\n")
+
+    global TRADE_MESSAGE
+    pyperclip.copy(TRADE_MESSAGE)
+
+    pyautogui.press("enter")
+
+    pyautogui.keyDown("ctrl")
+    pyautogui.press("v")
+    pyautogui.keyUp("ctrl")
+
+    pyautogui.press("enter")
+
+
 if __name__ == "__main__":
-    while True:
-        printCatchLog()
+    pyautogui.FAILSAFE = False
+    keyboard.on_press_key("esc", handle_close_app)
 
-        in_battle = game_in_battle_mode()
-        if not in_battle:
-            walk_until_start_battle()
+    try:
+        open_game_window()
 
-        BATTLE_COUNT += 1
-        sys.stdout.write("\nUma batalha foi iniciada ⚔️\n")
-        sys.stdout.flush()
+        while True:
+            if stop_execution == True:
+                sys.stdout.write("\n\n🔴 Encerrando aplicação 🔴\n\n")
+                break
 
-        time.sleep(4)
-        if enemy_pokemon_is_catchable():
-            catch_wild_pokemon()
-        elif enemy_pokemon_is_rare():
-            catch_wild_pokemon()
-        else:
-            run_away_wild_battle()
+            if TRADE_MESSAGE:
+                sendTradeChatMessage()
+
+            printCatchLog()
+
+            in_battle = game_in_battle_mode()
+            if not in_battle:
+                walk_until_start_battle()
+
+            BATTLE_COUNT += 1
+            sys.stdout.write("\nUma batalha foi iniciada ⚔️\n")
+            sys.stdout.flush()
+
+            time.sleep(2.5)
+            if enemy_pokemon_is_catchable():
+                catch_wild_pokemon()
+            elif enemy_pokemon_is_rare():
+                catch_wild_pokemon()
+            else:
+                run_away_wild_battle()
+
+    except KeyboardInterrupt:
+        handle_close_app()
