@@ -2,4 +2,7 @@ pyautogui
 opencv-python
 numpy
 pytesseract
- 
+pygetwindow
+pywinauto
+keyboard
+pyperclip
