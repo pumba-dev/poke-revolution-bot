@@ -9,13 +9,25 @@ import pygetwindow as gw
 from pywinauto import Application
 import keyboard
 import pyperclip
+import threading
 
-# Def catch list of pokemons
-GAME_WINDOW = "PROClient"
-BATTLE_COUNT = 0
-RARE_CATCH_COUNT = 0
-POKE_CATCH_COUNT = []
+## META DATA - Não mexer ##
+stop_execution = False  # Flag para encerrar a execução do bot
+GAME_WINDOW = "PROClient"  # Nome do processo do jogo
+LOG_IMG_COUNT = 1  # Contador de imagens salvas
+MAX_LOG_COUNT = 10  # Quantidade máxima de imagens salvas
+BATTLE_COUNT = 0  # Contador de batalhas
+RARE_CATCH_COUNT = 0  # Contador de pokemon raros capturados
+POKE_CATCH_COUNT = []  # Lista de pokemons capturados
+WAITING_CHECK_TIME = 3.5  # Tempo de espera antes de verificar se o pokemon é capturável
+
+
+## PARAMETROS DE CONFIGURACAO ##
+# |- Lista de pokebolas para captura
+# |- A ordem de prioridade é a ordem da lista
+# |- Deixe a pokebola visível na barra de ação do jogo.
 POKEBALL_LIST = ["pokeball", "ultraball"]
+# |- Lista de pokemons para captura
 CATCH_POKE_LIST = [
     "Summer",
     "Shiny",
@@ -24,11 +36,11 @@ CATCH_POKE_LIST = [
     "Snivy",
     "Tepig",
     "Charmander",
-    "Growlithe",
 ]
-TRADE_MESSAGE = "SELL # [Poke94832752] 22/29 Timid Protean # [Poke94878838] 27/30 Jolly # [Poke94771887] 30/30 Timid Gluttony"
-
-stop_execution = False
+# |- Mensagem para enviar no chat
+# |- Selecione, no jogo, o chat que deseja enviar a mensagem
+# |- Caso não queira enviar mensagem, deixar vazio (0 ou "")
+TRADE_MESSAGE = "auction # [Poke94832752] # [Poke94881200] # [Poke94771887] # https://pokemonrevolution.net/forum/topic/241022-froakie-2229-protean-tepig-3029-jolly-pansage-3030-timid"
 
 
 class Pokemon:
@@ -82,6 +94,8 @@ def click_at_position(x, y):
 
 
 def take_screenshot(size=None):
+    open_game_window()
+
     screen_width, screen_height = pyautogui.size()
     if size:
         width, height = size
@@ -115,32 +129,43 @@ def find_image_on_screen(image_path):
         return None
 
 
-def find_text_on_screen(search_string, image):
+def extract_text_on_battle(image):
     try:
+        global LOG_IMG_COUNT
+        base_dir = f"./logs/{LOG_IMG_COUNT}"
+
+        if not os.path.exists(base_dir):
+            os.makedirs(base_dir)
+
+        cv2.imwrite(f"./logs/{LOG_IMG_COUNT}/battle_image.png", image)
+
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        cv2.imwrite("./logs/gray_image.png", gray_image)
+        cv2.imwrite(f"./logs/{LOG_IMG_COUNT}/battle_gray_image.png", gray_image)
 
         _, processed_image = cv2.threshold(gray_image, 125, 255, cv2.THRESH_BINARY_INV)
 
-        # Definir o kernel para a operação de dilatação
         kernel = np.ones((1, 1), np.uint8)
         processed_image = cv2.dilate(processed_image, kernel, iterations=10)
 
         kernel = np.ones((1, 1), np.uint8)
         processed_image = cv2.erode(processed_image, kernel, iterations=10)
 
-        cv2.imwrite("./logs/processed_image.png", processed_image)
+        cv2.imwrite(
+            f"./logs/{LOG_IMG_COUNT}/battle_processed_image.png", processed_image
+        )
 
         custom_config = r"--oem 3 --psm 6"
         extracted_text = pytesseract.image_to_string(
             processed_image, config=custom_config
         )
 
-        with open("./logs/extracted_text.txt", "w", encoding="utf-8") as file:
+        with open(
+            f"./logs/{LOG_IMG_COUNT}/battle_extracted_text.txt", "w", encoding="utf-8"
+        ) as file:
             file.write(extracted_text.lower())
             file.flush()
 
-        return search_string.lower() in extracted_text.lower()
+        return extracted_text.lower()
     except Exception as e:
         print(f"Erro ao encontrar texto na tela: {e}")
         return False
@@ -164,26 +189,37 @@ def add_new_catched_poke(newPoke):
 
 def enemy_pokemon_is_catchable():
     sys.stdout.write("Verificando se o wild pokemon é capturável 🔄\n")
+
     screen = take_screenshot(size=(800, 500))
-    cv2.imwrite("./logs/screen.png", screen)
+    battleText = extract_text_on_battle(screen)
+
+    if not battleText:
+        sys.stdout.write("\rErro ao encontrar texto na tela ❌\n")
+        sys.stdout.flush()
+        return False
+
     for poke in CATCH_POKE_LIST:
-        if find_text_on_screen(poke, screen):
-            sys.stdout.flush()
+        if poke.lower() in battleText.lower():
             sys.stdout.write(f"\rEncontrado {poke} para capturar ✅\n")
+            sys.stdout.flush()
+
             add_new_catched_poke(poke)
             return poke
-    sys.stdout.flush()
+
     sys.stdout.write("\rPokemon não está na lista para captura ❌\n")
+    sys.stdout.flush()
     return False
 
 
 def enemy_pokemon_is_rare():
-    global RARE_CATCH_COUNT
     sys.stdout.write("Verificando se o wild pokemon é raro 🔄\n")
+
     rare_pokemon = find_image_on_screen("./assets/icons/rare_pokemon.png")
+
     if rare_pokemon:
         sys.stdout.flush()
         sys.stdout.write("\rPOKEMON RARO ENCONTRADO ✅\n")
+        global RARE_CATCH_COUNT
         RARE_CATCH_COUNT += 1
         return True
     else:
@@ -231,7 +267,6 @@ def run_away_wild_battle():
     sys.stdout.flush()
 
     in_battle = game_in_battle_mode()
-    open_game_window()
     while in_battle:
         pyautogui.press("4")
         time.sleep(0.5)
@@ -255,6 +290,8 @@ def printCatchLog():
 def sendTradeChatMessage():
     sys.stdout.write("\n📋 Mandando mensagem no Trade 🤝\n")
 
+    open_game_window()
+
     global TRADE_MESSAGE
     pyperclip.copy(TRADE_MESSAGE)
 
@@ -268,21 +305,22 @@ def sendTradeChatMessage():
 
 
 if __name__ == "__main__":
-    pyautogui.FAILSAFE = False
-    keyboard.on_press_key("esc", handle_close_app)
-
     try:
+        pyautogui.FAILSAFE = False
+        keyboard.on_press_key("esc", handle_close_app)
+
         open_game_window()
 
+        # LOOP PRINCIPAL
         while True:
             if stop_execution == True:
                 sys.stdout.write("\n\n🔴 Encerrando aplicação 🔴\n\n")
                 break
 
-            if TRADE_MESSAGE:
-                sendTradeChatMessage()
-
             printCatchLog()
+
+            if TRADE_MESSAGE and BATTLE_COUNT % 5 == 0:
+                sendTradeChatMessage()
 
             in_battle = game_in_battle_mode()
             if not in_battle:
@@ -292,13 +330,18 @@ if __name__ == "__main__":
             sys.stdout.write("\nUma batalha foi iniciada ⚔️\n")
             sys.stdout.flush()
 
-            time.sleep(2.5)
+            time.sleep(WAITING_CHECK_TIME)
+
             if enemy_pokemon_is_catchable():
                 catch_wild_pokemon()
             elif enemy_pokemon_is_rare():
                 catch_wild_pokemon()
             else:
                 run_away_wild_battle()
+
+            LOG_IMG_COUNT += 1
+            if LOG_IMG_COUNT > MAX_LOG_COUNT:
+                LOG_IMG_COUNT = 1
 
     except KeyboardInterrupt:
         handle_close_app()
