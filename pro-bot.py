@@ -19,28 +19,26 @@ MAX_LOG_COUNT = 10  # Quantidade máxima de imagens salvas
 BATTLE_COUNT = 0  # Contador de batalhas
 RARE_CATCH_COUNT = 0  # Contador de pokemon raros capturados
 POKE_CATCH_COUNT = []  # Lista de pokemons capturados
-WAITING_CHECK_TIME = 3.5  # Tempo de espera antes de verificar se o pokemon é capturável
-
+WAITING_TIME = 3.5  # Tempo de espera antes de verificar se o pokemon é capturável
+TRADE_MSG_TIME = 5  # Enviar mensagem no trade a cada X batalhas
+WALK_TIME = 0.4  # Tempo de caminhar para um lado
 
 ## PARAMETROS DE CONFIGURACAO ##
 # |- Lista de pokebolas para captura
 # |- A ordem de prioridade é a ordem da lista
 # |- Deixe a pokebola visível na barra de ação do jogo.
-POKEBALL_LIST = ["pokeball", "ultraball"]
+POKEBALL_LIST = ["ultraball"]
 # |- Lista de pokemons para captura
 CATCH_POKE_LIST = [
+    "Tepig",
     "Summer",
     "Shiny",
-    "Alolan",
-    "Froakie",
-    "Snivy",
-    "Tepig",
-    "Charmander",
 ]
 # |- Mensagem para enviar no chat
 # |- Selecione, no jogo, o chat que deseja enviar a mensagem
 # |- Caso não queira enviar mensagem, deixar vazio (0 ou "")
-TRADE_MESSAGE = "auction # [Poke94832752] # [Poke94881200] # [Poke94771887] # https://pokemonrevolution.net/forum/topic/241022-froakie-2229-protean-tepig-3029-jolly-pansage-3030-timid"
+TRADE_MESSAGE = "auction # min bid 100k each # [Poke94832752]#[Poke94881200]#[Poke94771887] # https://pokemonrevolution.net/forum/topic/241022-froakie-2229-protean-tepig-3029-jolly-pansage-3030-timid"
+# TRADE_MESSAGE = "auction # https://pokemonrevolution.net/forum/topic/241022-froakie-2229-protean-tepig-3029-jolly-pansage-3030-timid"
 
 
 class Pokemon:
@@ -78,14 +76,15 @@ def send_keys_to_process(keys):
 
 
 def open_game_window():
-    windows = gw.getWindowsWithTitle(GAME_WINDOW)
-
-    if not windows:
-        print(f"Janela do jogo não encontrada.")
-        return
-
-    window = windows[0]
-    window.activate()
+    try:
+        window = gw.getWindowsWithTitle(GAME_WINDOW)[0]
+        if window.isMinimized:
+            window.restore()
+        window.activate()
+    except IndexError:
+        print("Erro: Janela do jogo não encontrada.")
+    except gw.PyGetWindowException as e:
+        print(f"Erro ao ativar a janela do jogo: {e}")
 
 
 def click_at_position(x, y):
@@ -230,6 +229,7 @@ def enemy_pokemon_is_rare():
 
 def catch_wild_pokemon():
     sys.stdout.write("\nCapturando pokemon selvagem ⚪🔴\n")
+    global POKEBALL_LIST
     for pokeball in POKEBALL_LIST:
         pokeballPos = find_image_on_screen(f"./assets/pokeballs/{pokeball}.png")
         if pokeballPos:
@@ -237,7 +237,7 @@ def catch_wild_pokemon():
             in_battle = True
             while in_battle:
                 click_at_position(*pokeballPos)
-                time.sleep(1)
+                time.sleep(0.5)
                 in_battle = game_in_battle_mode()
             return True
     return False
@@ -250,10 +250,12 @@ def walk_until_start_battle():
         in_battle = game_in_battle_mode()
         if in_battle is not None:
             break
+        global BATTLE_COUNT
         side1 = "a" if BATTLE_COUNT % 2 == 0 else "d"
         side2 = "d" if BATTLE_COUNT % 2 == 0 else "a"
-        time1 = 0.2 + (0.4 * np.random.random())
-        time2 = 0.2 + (0.4 * np.random.random())
+        global WALK_TIME
+        time1 = 0.1 + ((WALK_TIME - 0.1) * np.random.random())
+        time2 = 0.1 + ((WALK_TIME - 0.1) * np.random.random())
         pyautogui.keyDown(side1)
         time.sleep(time1)
         pyautogui.keyUp(side1)
@@ -276,6 +278,7 @@ def run_away_wild_battle():
 def printCatchLog():
     global BATTLE_COUNT
     global RARE_CATCH_COUNT
+    global POKE_CATCH_COUNT
     sys.stdout.write("\n\n\n📍 INICIANDO NOVO CICLO 📍\n\n")
     sys.stdout.write("💥 Batalhas iniciadas: " + str(BATTLE_COUNT) + "\n")
     sys.stdout.write("💎 Pokemons raros capturados: " + str(RARE_CATCH_COUNT) + "\n")
@@ -319,7 +322,7 @@ if __name__ == "__main__":
 
             printCatchLog()
 
-            if TRADE_MESSAGE and BATTLE_COUNT % 5 == 0:
+            if TRADE_MESSAGE and BATTLE_COUNT % 10 == 0:
                 sendTradeChatMessage()
 
             in_battle = game_in_battle_mode()
@@ -330,7 +333,7 @@ if __name__ == "__main__":
             sys.stdout.write("\nUma batalha foi iniciada ⚔️\n")
             sys.stdout.flush()
 
-            time.sleep(WAITING_CHECK_TIME)
+            time.sleep(WAITING_TIME)
 
             if enemy_pokemon_is_catchable():
                 catch_wild_pokemon()
