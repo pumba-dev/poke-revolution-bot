@@ -19,26 +19,29 @@ MAX_LOG_COUNT = 10  # Quantidade máxima de imagens salvas
 BATTLE_COUNT = 0  # Contador de batalhas
 RARE_CATCH_COUNT = 0  # Contador de pokemon raros capturados
 POKE_CATCH_COUNT = []  # Lista de pokemons capturados
-WAITING_TIME = 3.5  # Tempo de espera antes de verificar se o pokemon é capturável
-TRADE_MSG_TIME = 5  # Enviar mensagem no trade a cada X batalhas
-WALK_TIME = 0.4  # Tempo de caminhar para um lado
+WAITING_TIME = 3.25  # Tempo de espera antes de verificar se o pokemon é capturável
+TRADE_MSG_TIME = 10  # Enviar mensagem no trade a cada X batalhas
+WALK_TIME = 0.5  # Tempo de caminhar para um lado
 
 ## PARAMETROS DE CONFIGURACAO ##
 # |- Lista de pokebolas para captura
 # |- A ordem de prioridade é a ordem da lista
 # |- Deixe a pokebola visível na barra de ação do jogo.
-POKEBALL_LIST = ["ultraball"]
+CATCH_POKEBALL = "ultraball"
 # |- Lista de pokemons para captura
 CATCH_POKE_LIST = [
+    "Snivy",
+    "Froakie",
     "Tepig",
     "Summer",
     "Shiny",
 ]
 # |- Mensagem para enviar no chat
 # |- Selecione, no jogo, o chat que deseja enviar a mensagem
-# |- Caso não queira enviar mensagem, deixar vazio (0 ou "")
-TRADE_MESSAGE = "auction # min bid 100k each # [Poke94832752]#[Poke94881200]#[Poke94771887] # https://pokemonrevolution.net/forum/topic/241022-froakie-2229-protean-tepig-3029-jolly-pansage-3030-timid"
-# TRADE_MESSAGE = "auction # https://pokemonrevolution.net/forum/topic/241022-froakie-2229-protean-tepig-3029-jolly-pansage-3030-timid"
+# |- Caso não queira enviar mensagem, deixar vazio (0 ou None)
+# TRADE_MESSAGE = "want to sell # epic [Poke94957828] 3x 31 # Summer protean (bb) [Poke95096645] # send u offer pm"
+# TRADE_MESSAGE = "BUY BLACK MEDALLION | 170K | PM ME"ad
+TRADE_MESSAGE = None
 
 
 class Pokemon:
@@ -82,9 +85,11 @@ def open_game_window():
             window.restore()
         window.activate()
     except IndexError:
-        print("Erro: Janela do jogo não encontrada.")
+        # print("Erro: Janela do jogo não encontrada.")
+        return
     except gw.PyGetWindowException as e:
-        print(f"Erro ao ativar a janela do jogo: {e}")
+        # print(f"Erro ao ativar a janela do jogo: {e}")
+        return
 
 
 def click_at_position(x, y):
@@ -108,7 +113,7 @@ def take_screenshot(size=None):
     return screenshot_cv2
 
 
-def find_image_on_screen(image_path):
+def find_image_on_screen(image_path, threshold=0.8):
     script_dir = os.path.dirname(__file__)
     abs_image_path = os.path.join(script_dir, image_path)
     template = cv2.imread(abs_image_path, cv2.IMREAD_GRAYSCALE)
@@ -120,7 +125,7 @@ def find_image_on_screen(image_path):
     screen_gray = cv2.cvtColor(screen, cv2.COLOR_BGR2GRAY)
     res = cv2.matchTemplate(screen_gray, template, cv2.TM_CCOEFF_NORMED)
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-    if max_val > 0.8:
+    if max_val > threshold:
         w, h = template.shape[::-1]
         center_x, center_y = max_loc[0] + w // 2, max_loc[1] + h // 2
         return center_x, center_y
@@ -193,7 +198,9 @@ def enemy_pokemon_is_catchable():
     battleText = extract_text_on_battle(screen)
 
     if not battleText:
-        sys.stdout.write("\rErro ao encontrar texto na tela ❌\n")
+        sys.stdout.write(
+            "[ERROR] Algo inexperado aconteceu ao extrair texto da imagem da batalha ❌\n"
+        )
         sys.stdout.flush()
         return False
 
@@ -211,14 +218,13 @@ def enemy_pokemon_is_catchable():
 
 
 def enemy_pokemon_is_rare():
+    global RARE_CATCH_COUNT
     sys.stdout.write("Verificando se o wild pokemon é raro 🔄\n")
 
     rare_pokemon = find_image_on_screen("./assets/icons/rare_pokemon.png")
-
     if rare_pokemon:
         sys.stdout.flush()
-        sys.stdout.write("\rPOKEMON RARO ENCONTRADO ✅\n")
-        global RARE_CATCH_COUNT
+        sys.stdout.write("\n🎉 POKEMON RARO ENCONTRADO!! ✅\n")
         RARE_CATCH_COUNT += 1
         return True
     else:
@@ -228,18 +234,21 @@ def enemy_pokemon_is_rare():
 
 
 def catch_wild_pokemon():
+    global CATCH_POKEBALL
     sys.stdout.write("\nCapturando pokemon selvagem ⚪🔴\n")
-    global POKEBALL_LIST
-    for pokeball in POKEBALL_LIST:
-        pokeballPos = find_image_on_screen(f"./assets/pokeballs/{pokeball}.png")
-        if pokeballPos:
-            print("Item utilizado: " + pokeball)
-            in_battle = True
-            while in_battle:
-                click_at_position(*pokeballPos)
-                time.sleep(0.5)
-                in_battle = game_in_battle_mode()
-            return True
+
+    pokeball = find_image_on_screen(f"./assets/pokeballs/{CATCH_POKEBALL}.png", 0.95)
+    if pokeball:
+        in_battle = True
+        while in_battle:
+            time.sleep(0.25)
+            click_at_position(*pokeball)
+            in_battle = game_in_battle_mode()
+        return True
+    else:
+        sys.stdout.write("[ERROR] Pokebola não encontrada ❌\n")
+        handle_close_app()
+
     return False
 
 
@@ -251,11 +260,11 @@ def walk_until_start_battle():
         if in_battle is not None:
             break
         global BATTLE_COUNT
-        side1 = "a" if BATTLE_COUNT % 2 == 0 else "d"
-        side2 = "d" if BATTLE_COUNT % 2 == 0 else "a"
+        side1 = "a" if BATTLE_COUNT % np.random.randint(2, 3) == 0 else "d"
+        side2 = "d" if BATTLE_COUNT % np.random.randint(2, 3) == 0 else "a"
         global WALK_TIME
-        time1 = 0.1 + ((WALK_TIME - 0.1) * np.random.random())
-        time2 = 0.1 + ((WALK_TIME - 0.1) * np.random.random())
+        time1 = 0.2 + ((WALK_TIME - 0.2) * np.random.random())
+        time2 = 0.2 + ((WALK_TIME - 0.2) * np.random.random())
         pyautogui.keyDown(side1)
         time.sleep(time1)
         pyautogui.keyUp(side1)
@@ -270,8 +279,8 @@ def run_away_wild_battle():
 
     in_battle = game_in_battle_mode()
     while in_battle:
+        time.sleep(0.3)
         pyautogui.press("4")
-        time.sleep(0.5)
         in_battle = game_in_battle_mode()
 
 
@@ -279,15 +288,29 @@ def printCatchLog():
     global BATTLE_COUNT
     global RARE_CATCH_COUNT
     global POKE_CATCH_COUNT
+    global BALL_USE_COUNT
+
     sys.stdout.write("\n\n\n📍 INICIANDO NOVO CICLO 📍\n\n")
-    sys.stdout.write("💥 Batalhas iniciadas: " + str(BATTLE_COUNT) + "\n")
-    sys.stdout.write("💎 Pokemons raros capturados: " + str(RARE_CATCH_COUNT) + "\n")
-    sys.stdout.write("🔴 Pokemons capturados ⚪️ \n")
-    if len(POKE_CATCH_COUNT) == 0:
-        sys.stdout.write("Nenhum 🅾️\n")
+
+    sys.stdout.write("💥 Batalhas iniciadas: ")
+    if BATTLE_COUNT > 0:
+        sys.stdout.write(str(BATTLE_COUNT) + "\n")
     else:
+        sys.stdout.write("🅾️\n")
+
+    sys.stdout.write("💎 Raros capturados: ")
+    if RARE_CATCH_COUNT > 0:
+        sys.stdout.write(str(RARE_CATCH_COUNT) + "\n")
+    else:
+        sys.stdout.write("🅾️\n")
+
+    sys.stdout.write("🔴⚪️ Pokemons capturados: ")
+    if len(POKE_CATCH_COUNT) > 0:
+        sys.stdout.write("\n")
         for poke in POKE_CATCH_COUNT:
             sys.stdout.write(f"{poke}\n")
+    else:
+        sys.stdout.write("🅾️\n")
 
 
 def sendTradeChatMessage():
@@ -322,7 +345,7 @@ if __name__ == "__main__":
 
             printCatchLog()
 
-            if TRADE_MESSAGE and BATTLE_COUNT % 10 == 0:
+            if TRADE_MESSAGE and BATTLE_COUNT % TRADE_MSG_TIME == 0:
                 sendTradeChatMessage()
 
             in_battle = game_in_battle_mode()
